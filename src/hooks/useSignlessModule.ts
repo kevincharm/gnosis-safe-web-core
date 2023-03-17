@@ -1,8 +1,11 @@
+import useLocalStorage from '@/services/local-storage/useLocalStorage'
 import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender'
-import { useCallback, useMemo, useState } from 'react'
+import { ethers } from 'ethers'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getSafeSDK } from './coreSDK/safeCoreSDK'
 import useChainId from './useChainId'
 import useSafeInfo from './useSafeInfo'
+import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
   if (chainId === '100') {
@@ -10,13 +13,49 @@ export function getSignlessModuleAddress(chainId: string) {
   }
 }
 
+export async function createEncryptedKey(password: string) {
+  const wallet = ethers.Wallet.createRandom()
+  return wallet.encrypt(password)
+}
+
+export async function createEnableSignlessModule(chainId: string) {
+  const sdk = getSafeSDK()
+  const signlessModuleAddress = getSignlessModuleAddress(chainId)
+  if (!sdk || !signlessModuleAddress) return
+
+  const enableModuleTx = await sdk.createEnableModuleTx(signlessModuleAddress)
+  const tx = {
+    to: enableModuleTx.data.to,
+    value: '0',
+    data: enableModuleTx.data.data,
+  }
+  return createMultiSendCallOnlyTx([tx])
+}
+
+export async function createRegisterDelegateSignerTx(chainId: string, delegateAddress: string, expiry: number) {
+  const signlessModuleAddress = getSignlessModuleAddress(chainId)
+  if (!signlessModuleAddress) return
+
+  const signless = new ethers.utils.Interface([
+    'function registerDelegateSigner(address delegate, uint96 expiry) external',
+  ])
+  const data = signless.encodeFunctionData('registerDelegateSigner', [delegateAddress, expiry])
+  const tx = {
+    to: signlessModuleAddress,
+    value: '0',
+    data,
+  }
+  return createMultiSendCallOnlyTx([tx])
+}
+
 export default function useSignlessModule() {
   const { safe } = useSafeInfo()
   const chainId = useChainId()
   const sdk = getSafeSDK()
 
+  const signlessModuleAddress = useMemo(() => getSignlessModuleAddress(chainId), [chainId])
+
   const isSignlessEnabled = useMemo(() => {
-    const signlessModuleAddress = getSignlessModuleAddress(chainId)
     if (!signlessModuleAddress) {
       return false
     }
@@ -25,48 +64,70 @@ export default function useSignlessModule() {
       (addr) => addr.value.toLowerCase() === signlessModuleAddress.toLowerCase(),
     )
     return Boolean(signlessModule)
-  }, [safe, chainId])
+  }, [safe, signlessModuleAddress])
 
-  const enableSignlessModule = useCallback(async () => {
-    const signlessModuleAddress = getSignlessModuleAddress(chainId)
-    if (!sdk || !signlessModuleAddress) {
-      return
-    }
+  const [delegatePrivateKeys, setPrivateKeys] = useLocalStorage<{ [safeAddress: string]: string }>(
+    'signlessPrivateKeys',
+  )
+  const delegatePrivateKey = useMemo(() => {
+    if (!delegatePrivateKeys || !safe) return
+    return delegatePrivateKeys[safe.address.value]
+  }, [delegatePrivateKeys, safe])
+  const setPrivateKey = useCallback(
+    (privateKey: string) => {
+      if (!safe) return
 
-    const enableModuleTx = await sdk.createEnableModuleTx(signlessModuleAddress)
-    const tx = {
-      to: enableModuleTx.data.to,
-      value: '0',
-      data: enableModuleTx.data.data,
-    }
-    return createMultiSendCallOnlyTx([tx])
-  }, [sdk, chainId])
+      setPrivateKeys({
+        ...delegatePrivateKeys,
+        [safe.address.value]: privateKey,
+      })
+    },
+    [safe, delegatePrivateKeys, setPrivateKeys],
+  )
 
-  const disableSignlessModule = useCallback(async () => {
-    const signlessModuleAddress = getSignlessModuleAddress(chainId)
-    if (!sdk || !signlessModuleAddress || !isSignlessEnabled) {
-      return
-    }
+  const createLocalDelegate = useCallback(() => {
+    if (delegatePrivateKey) throw new Error('A signless key already exists on this browser!')
 
-    const disableModuleTx = await sdk.createDisableModuleTx(signlessModuleAddress)
-    const tx = {
-      to: disableModuleTx.data.to,
-      value: '0',
-      data: disableModuleTx.data.data,
-    }
-    return createMultiSendCallOnlyTx([tx])
-  }, [sdk, chainId, isSignlessEnabled])
+    if (!sdk || !signlessModuleAddress) return
 
-  const [openEnableSignless, setOpenEnableSignless] = useState<boolean>(false)
-  const [openDisableSignless, setOpenDisableSignless] = useState<boolean>(false)
+    const delegateWallet = ethers.Wallet.createRandom()
+    setPrivateKey(delegateWallet.privateKey)
+  }, [sdk, signlessModuleAddress, delegatePrivateKey, setPrivateKey])
+
+  const readProvider = useWeb3ReadOnly()
+  const signlessContract = useMemo(() => {
+    if (!signlessModuleAddress || !readProvider) return
+
+    return new ethers.Contract(
+      signlessModuleAddress,
+      [
+        'function isValidDelegate(address safe, address delegate) external view returns (bool)',
+        'function registerDelegateSigner(address delegate, uint96 expiry) external',
+      ],
+      readProvider,
+    )
+  }, [signlessModuleAddress, readProvider])
+  const [isValidDelegate, setIsValidDelegate] = useState<boolean>(false)
+  useEffect(() => {
+    if (!safe || !signlessContract || !delegatePrivateKey) return
+
+    const delegate = new ethers.Wallet(delegatePrivateKey)
+    signlessContract.isValidDelegate(safe.address.value, delegate.address).then((ret: boolean) => {
+      setIsValidDelegate(ret)
+    })
+  }, [safe, signlessContract, delegatePrivateKey])
+
+  const delegateAddress = useMemo(() => {
+    if (!delegatePrivateKey) return
+    return new ethers.Wallet(delegatePrivateKey).address
+  }, [delegatePrivateKey])
 
   return {
+    signlessModuleAddress,
     isSignlessEnabled,
-    enableSignlessModule,
-    disableSignlessModule,
-    openDisableSignless,
-    setOpenDisableSignless,
-    openEnableSignless,
-    setOpenEnableSignless,
+    delegatePrivateKey,
+    delegateAddress,
+    isValidDelegate,
+    createLocalDelegate,
   }
 }
