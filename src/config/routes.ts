@@ -29,6 +29,7 @@ export const AppRoutes = {
     spendingLimits: '/settings/spending-limits',
     setup: '/settings/setup',
     modules: '/settings/modules',
+    signless: '/settings/signless',
     index: '/settings',
     environmentVariables: '/settings/environment-variables',
     data: '/settings/data',

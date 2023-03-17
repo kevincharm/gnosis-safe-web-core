@@ -89,6 +89,10 @@ export const settingsNavItems = [
     href: AppRoutes.settings.modules,
   },
   {
+    label: 'Signless',
+    href: AppRoutes.settings.signless,
+  },
+  {
     label: 'Spending limits',
     href: AppRoutes.settings.spendingLimits,
   },
