@@ -46,6 +46,7 @@ import SafeAppIframe from './SafeAppIframe'
 import useGetSafeInfo from './useGetSafeInfo'
 import { hasFeature, FEATURES } from '@/utils/chains'
 import { selectTokenList, TOKEN_LISTS } from '@/store/settingsSlice'
+import SignlessTxModal from '../SafeAppsTxModal/SignlessTxModal'
 
 const UNKNOWN_APP_NAME = 'Unknown App'
 
@@ -56,7 +57,7 @@ type AppFrameProps = {
 
 const AppFrame = ({ appUrl, allowedFeaturesList }: AppFrameProps): ReactElement => {
   const chainId = useChainId()
-  const [txModalState, openTxModal, closeTxModal] = useTxModal()
+  const [txModalState, openTxModal, closeTxModal, signlessTxModalState] = useTxModal()
   const [settings, setSettings] = useState<SafeSettings>({})
   const safeMessages = useAppSelector(selectSafeMessages)
   const [signMessageModalState, openSignMessageModal, closeSignMessageModal] = useSignMessageModal()
@@ -303,6 +304,8 @@ const AppFrame = ({ appUrl, allowedFeaturesList }: AppFrameProps): ReactElement 
             ]}
           />
         )}
+
+        {signlessTxModalState.isOpen && <SignlessTxModal data={signlessTxModalState} />}
 
         {signMessageModalState.isOpen &&
           (signMessageModalState.isOffChain ? (
