@@ -143,8 +143,9 @@ const useTxModal = (): ReturnType => {
           })
           console.log(`Gelato relay taskId: ${relayResponse.taskId}`)
 
-          for (let tries = 0; tries < 10; tries++) {
-            await new Promise((resolve) => setTimeout(resolve, (tries + 1) * 5000 /** exp backoff */))
+          for (let tries = 0; tries < 8; tries++) {
+            const expFactor = 2 ** tries
+            await new Promise((resolve) => setTimeout(resolve, 2500 * expFactor))
 
             const relayTaskStatus = await relay.getTaskStatus(relayResponse.taskId)
             if (!relayTaskStatus) continue
