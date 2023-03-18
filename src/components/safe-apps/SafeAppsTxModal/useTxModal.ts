@@ -152,6 +152,7 @@ const useTxModal = (): ReturnType => {
       signlessContract,
       isSignlessEnabled,
       isValidDelegate,
+      delegateAddress,
       delegatePrivateKey,
       readOnlyProvider,
     ],
