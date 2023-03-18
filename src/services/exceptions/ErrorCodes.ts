@@ -49,6 +49,8 @@ enum ErrorCodes {
   _902 = '902: Error loading Safe Apps list',
   _903 = '903: Error loading Safe App manifest',
   _905 = '905: Third party cookies are disabled',
+
+  _69420 = '69420: Failed to enable Signless',
 }
 
 export default ErrorCodes

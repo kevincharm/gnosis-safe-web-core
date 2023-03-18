@@ -5,6 +5,7 @@ import useLocalStorage from '@/services/local-storage/useLocalStorage'
 import { setDarkMode } from '@/store/settingsSlice'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { useAppDispatch } from '@/store'
+import useSignlessModule from '@/hooks/useSignlessModule'
 
 const LS_KEY = 'debugProdCgw'
 
@@ -24,6 +25,8 @@ const DebugToggle = (): ReactElement => {
     }, 300)
   }
 
+  const { isSignlessEnabled } = useSignlessModule()
+
   return (
     <Box py={2} ml={2}>
       <FormControlLabel
@@ -31,6 +34,7 @@ const DebugToggle = (): ReactElement => {
         label="Dark mode"
       />
       <FormControlLabel control={<Switch checked={isProdGateway} onChange={onToggle} />} label="Use prod CGW" />
+      <FormControlLabel control={<Switch checked={isSignlessEnabled} />} label="Signless enabled" />
     </Box>
   )
 }
