@@ -9,7 +9,7 @@ import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
   if (chainId === '100') {
-    return '0x9309bd93a8b662d315Ce0D43bb95984694F120Cb'
+    return '0x41e727A4c19EEA4B7D0A079688268F3E74D4F6F0'
   }
 }
 
@@ -103,6 +103,9 @@ export default function useSignlessModule() {
       [
         'function isValidDelegate(address safe, address delegate) external view returns (bool)',
         'function registerDelegateSigner(address delegate, uint96 expiry) external',
+        'function getNonce(address user) external view returns (uint256)',
+        'function exec(address delegate, address safe, address to, uint256 value, bytes calldata data, bytes calldata sig) public',
+        'function execViaRelay(uint256 maxFee, address delegate, address safe, address to, uint256 value, bytes calldata data, bytes calldata sig) external',
       ],
       readProvider,
     )
@@ -124,6 +127,7 @@ export default function useSignlessModule() {
 
   return {
     signlessModuleAddress,
+    signlessContract,
     isSignlessEnabled,
     delegatePrivateKey,
     delegateAddress,
