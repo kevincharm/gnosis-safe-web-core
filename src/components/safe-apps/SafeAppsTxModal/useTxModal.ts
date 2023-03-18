@@ -142,40 +142,38 @@ const useTxModal = (): ReturnType => {
             feeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
           })
           console.log(`Gelato relay taskId: ${relayResponse.taskId}`)
-          const safeTxHash = await safe.getTransactionHash(safeTx)
-          txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+
+          for (let tries = 0; tries < 10; tries++) {
+            await new Promise((resolve) => setTimeout(resolve, (tries + 1) * 5000 /** exp backoff */))
+
+            const relayTaskStatus = await relay.getTaskStatus(relayResponse.taskId)
+            if (!relayTaskStatus) continue
+
+            const taskState = relayTaskStatus.taskState
+            if (taskState === 'ExecSuccess') {
+              return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+                safeAppRequestId: requestId,
+                safeTxHash: relayTaskStatus.transactionHash!,
+              })
+            } else if (
+              taskState === 'CheckPending' ||
+              taskState === 'ExecPending' ||
+              taskState === 'WaitingForConfirmation'
+            ) {
+              // "Pending"
+              continue
+            } else {
+              return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+                safeAppRequestId: requestId,
+                safeTxHash: relayTaskStatus.transactionHash!,
+              })
+            }
+          }
+
+          return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
             safeAppRequestId: requestId,
-            safeTxHash,
+            safeTxHash: '0x',
           })
-
-          // for (let tries = 0; tries < 10; tries++) {
-          //   await new Promise((resolve) => setTimeout(resolve, (tries + 1) * 5000 /** exp backoff */))
-
-          //   const relayTaskStatus = await relay.getTaskStatus(relayResponse.taskId)
-          //   if (!relayTaskStatus) continue
-
-          //   const taskState = relayTaskStatus.taskState
-          //   if (taskState === 'ExecSuccess') {
-          //     return txDispatch(TxEvent.SUCCESS, {
-          //       txId: relayTaskStatus.transactionHash,
-          //       groupKey: '' /** wat is this */,
-          //     })
-          //   } else if (
-          //     taskState === 'CheckPending' ||
-          //     taskState === 'ExecPending' ||
-          //     taskState === 'WaitingForConfirmation'
-          //   ) {
-          //     // "Pending"
-          //     continue
-          //   } else {
-          //     const safeTxHash = await safe.getTransactionHash(safeTx)
-          //     return txDispatch(TxEvent.SAFE_APPS_REQUEST, { safeAppRequestId: requestId, safeTxHash })
-          //   }
-          // }
-
-          // return txDispatch(TxEvent.PROPOSE_FAILED, {
-          //   error: new Error(`Relay failed for: ${relayResponse.taskId}`),
-          // })
         })()
       } else {
         // No delegate enabled -> regular tx signing flow
