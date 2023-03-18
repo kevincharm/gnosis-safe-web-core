@@ -16,6 +16,8 @@ import { Errors, logError } from '@/services/exceptions'
 import useChainId from '@/hooks/useChainId'
 import { addDays } from 'date-fns'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import css from '@/components/settings/SafeModules/styles.module.css'
+import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender/create'
 
 function useSignlessModals() {
   const [openEnableSignless, setOpenEnableSignless] = useState<boolean>(false)
@@ -172,8 +174,64 @@ const LocalDelegate = () => {
   )
 }
 
+const RevokeKeyModal = ({ data, onSubmit }: { data: { index: number }; onSubmit: () => void }) => {
+  const chainId = useChainId()
+  const { signlessContract } = useSignlessModule()
+  const [safeTx, safeTxError] = useAsync<SafeTransaction | undefined>(async () => {
+    if (!signlessContract || !data || typeof data.index === 'undefined') return
+
+    const tx = await signlessContract.populateTransaction.revokeDelegateSigner(data.index)
+    return createMultiSendCallOnlyTx([
+      {
+        to: tx.to!,
+        value: tx.value?.toString() || '0',
+        data: tx.data!,
+      },
+    ])
+  }, [chainId, signlessContract, data])
+
+  useEffect(() => {
+    // if (safeTxError) {
+    // logError(Errors._69420, safeTxError.message)
+    // }
+  }, [safeTxError])
+
+  const onFormSubmit = () => {
+    // trackEvent(SETTINGS_EVENTS.MODULES.REMOVE_MODULE)
+
+    onSubmit()
+  }
+
+  return <SignOrExecuteForm safeTx={safeTx} onSubmit={onFormSubmit} error={safeTxError} />
+}
+
+const revokeKeyModalSteps: TxStepperProps['steps'] = [
+  {
+    label: 'Revoke key',
+    render: (data, onSubmit) => <RevokeKeyModal data={data as any} onSubmit={onSubmit} />,
+  },
+]
+
+const RegisteredDelegate = ({ index, delegate }: { index: number; delegate: string }) => {
+  const [openRevokeModal, setOpenRevokeModal] = useState<boolean>(false)
+
+  return (
+    <>
+      <Box className={css.container}>
+        {delegate}{' '}
+        <Button color="error" onClick={() => setOpenRevokeModal(true)}>
+          Revoke
+        </Button>
+      </Box>
+      {openRevokeModal && (
+        <TxModal onClose={() => setOpenRevokeModal(false)} steps={revokeKeyModalSteps} initialData={[{ index }]} />
+      )}
+    </>
+  )
+}
+
 const RegisterDelegate = () => {
-  const { delegateAddress, isValidDelegate } = useSignlessModule()
+  const { delegateAddress, isValidDelegate, isSignlessEnabled, registeredDelegates } = useSignlessModule()
   const { openRegisterDelegate, setOpenRegisterDelegate } = useSignlessModals()
 
   // TODO(kevincharm): take expiry from a textfield
@@ -201,18 +259,22 @@ const RegisterDelegate = () => {
               {isValidDelegate ? (
                 <Typography display="flex" alignItems="center">
                   <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
-                  <Box pr={1}>
-                    <code>{delegateAddress}</code>
-                  </Box>{' '}
-                  is registered as an ephemeral key for this Safe.
+                  Your ephemeral key is registered for this Safe.
                 </Typography>
               ) : (
                 delegateAddress && (
-                  <Button variant="contained" onClick={() => setOpenRegisterDelegate(true)}>
+                  <Button
+                    variant="contained"
+                    onClick={() => setOpenRegisterDelegate(true)}
+                    disabled={!isSignlessEnabled}
+                  >
                     Register {delegateAddress.slice(0, 6)}..{delegateAddress.slice(-4)} as delegate
                   </Button>
                 )
               )}
+              {registeredDelegates.map((delegate, i) => (
+                <RegisteredDelegate key={i} index={i} delegate={delegate} />
+              ))}
             </Box>
           </Grid>
         </Grid>

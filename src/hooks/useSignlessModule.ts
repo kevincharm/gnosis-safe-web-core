@@ -1,6 +1,7 @@
 import useLocalStorage from '@/services/local-storage/useLocalStorage'
 import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender'
 import { ethers } from 'ethers'
+import type { BigNumber } from 'ethers'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getSafeSDK } from './coreSDK/safeCoreSDK'
 import useChainId from './useChainId'
@@ -9,7 +10,7 @@ import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
   if (chainId === '100') {
-    return '0xA93f25b14A2684718a2eF697b070c192C3674b04'
+    return '0x0841dEF9362c205a5F59A5e232d925fC7A8d8537'
   }
 }
 
@@ -104,6 +105,7 @@ export default function useSignlessModule() {
         'function isValidDelegate(address safe, address delegate) external view returns (bool)',
         'function registerDelegateSigner(address delegate, uint64 expiry) external',
         'function revokeDelegateSigner(uint256 delegateIndex) external',
+        'function getDelegateSignersCount(address safe) external view returns (uint256)',
         'function getDelegateSignersPaginated(address safe, uint256 offset, uint256 maxPageSize) external view returns (address[] memory signers)',
         'function getNonce(address user) external view returns (uint256)',
         'function exec(address delegate, address safe, address to, uint256 value, bytes calldata data, bytes calldata sig) public',
@@ -114,7 +116,7 @@ export default function useSignlessModule() {
   }, [signlessModuleAddress, readProvider])
   const [isValidDelegate, setIsValidDelegate] = useState<boolean>(false)
   useEffect(() => {
-    if (!safe || !signlessContract || !delegatePrivateKey) return
+    if (!safe || !safe.address.value || !signlessContract || !delegatePrivateKey) return
 
     const delegate = new ethers.Wallet(delegatePrivateKey)
     signlessContract.isValidDelegate(safe.address.value, delegate.address).then((ret: boolean) => {
@@ -127,6 +129,24 @@ export default function useSignlessModule() {
     return new ethers.Wallet(delegatePrivateKey).address
   }, [delegatePrivateKey])
 
+  const [registeredDelegates, setRegisteredDelegates] = useState<string[]>([])
+  useEffect(() => {
+    if (!safe || !safe.address.value || !signlessContract) return
+
+    signlessContract
+      .getDelegateSignersCount(safe.address.value)
+      .then((count: BigNumber) => {
+        if (count.gt(0)) {
+          return signlessContract.getDelegateSignersPaginated(safe.address.value, 0, count)
+        } else {
+          return Promise.resolve([])
+        }
+      })
+      .then((addresses: string[]) => {
+        setRegisteredDelegates(addresses)
+      })
+  }, [safe, signlessContract, setRegisteredDelegates])
+
   return {
     signlessModuleAddress,
     signlessContract,
@@ -135,5 +155,6 @@ export default function useSignlessModule() {
     delegateAddress,
     isValidDelegate,
     createLocalDelegate,
+    registeredDelegates,
   }
 }
