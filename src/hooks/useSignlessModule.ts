@@ -9,7 +9,7 @@ import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
   if (chainId === '100') {
-    return '0x41e727A4c19EEA4B7D0A079688268F3E74D4F6F0'
+    return '0xA93f25b14A2684718a2eF697b070c192C3674b04'
   }
 }
 
@@ -37,7 +37,7 @@ export async function createRegisterDelegateSignerTx(chainId: string, delegateAd
   if (!signlessModuleAddress) return
 
   const signless = new ethers.utils.Interface([
-    'function registerDelegateSigner(address delegate, uint96 expiry) external',
+    'function registerDelegateSigner(address delegate, uint64 expiry) external',
   ])
   const data = signless.encodeFunctionData('registerDelegateSigner', [delegateAddress, expiry])
   const tx = {
@@ -102,7 +102,9 @@ export default function useSignlessModule() {
       signlessModuleAddress,
       [
         'function isValidDelegate(address safe, address delegate) external view returns (bool)',
-        'function registerDelegateSigner(address delegate, uint96 expiry) external',
+        'function registerDelegateSigner(address delegate, uint64 expiry) external',
+        'function revokeDelegateSigner(uint256 delegateIndex) external',
+        'function getDelegateSignersPaginated(address safe, uint256 offset, uint256 maxPageSize) external view returns (address[] memory signers)',
         'function getNonce(address user) external view returns (uint256)',
         'function exec(address delegate, address safe, address to, uint256 value, bytes calldata data, bytes calldata sig) public',
         'function execViaRelay(uint256 maxFee, address delegate, address safe, address to, uint256 value, bytes calldata data, bytes calldata sig) external',
