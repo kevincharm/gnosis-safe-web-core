@@ -71,12 +71,12 @@ export default function useSignlessModule() {
     'signlessPrivateKeys',
   )
   const delegatePrivateKey = useMemo(() => {
-    if (!delegatePrivateKeys || !safe) return
+    if (!delegatePrivateKeys || !safe.address.value) return
     return delegatePrivateKeys[safe.address.value]
   }, [delegatePrivateKeys, safe])
   const setPrivateKey = useCallback(
     (privateKey: string) => {
-      if (!safe) return
+      if (!safe || !safe.address.value) return
 
       setPrivateKeys({
         ...delegatePrivateKeys,
@@ -94,6 +94,16 @@ export default function useSignlessModule() {
     const delegateWallet = ethers.Wallet.createRandom()
     setPrivateKey(delegateWallet.privateKey)
   }, [sdk, signlessModuleAddress, delegatePrivateKey, setPrivateKey])
+
+  const deleteLocalDelegate = useCallback(() => {
+    if (!safe || !safe.address.value) return
+
+    const nextDelegatePrivateKeys = {
+      ...delegatePrivateKeys,
+    }
+    delete nextDelegatePrivateKeys[safe.address.value]
+    setPrivateKeys(nextDelegatePrivateKeys)
+  }, [safe, delegatePrivateKeys, setPrivateKeys])
 
   const readProvider = useWeb3ReadOnly()
   const signlessContract = useMemo(() => {
@@ -155,6 +165,7 @@ export default function useSignlessModule() {
     delegateAddress,
     isValidDelegate,
     createLocalDelegate,
+    deleteLocalDelegate,
     registeredDelegates,
   }
 }

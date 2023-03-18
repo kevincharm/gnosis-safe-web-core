@@ -133,7 +133,7 @@ const EnableSignless = () => {
 }
 
 const LocalDelegate = () => {
-  const { delegatePrivateKey, delegateAddress, createLocalDelegate } = useSignlessModule()
+  const { delegatePrivateKey, delegateAddress, createLocalDelegate, deleteLocalDelegate } = useSignlessModule()
 
   return (
     <>
@@ -154,13 +154,18 @@ const LocalDelegate = () => {
             </Box>
             <Box pt={2}>
               {delegatePrivateKey ? (
-                <Typography display="flex" alignItems="center">
-                  <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
-                  Ephemeral key for this Safe:{' '}
-                  <Box px={1}>
-                    <code>{delegateAddress}</code>
-                  </Box>
-                </Typography>
+                <>
+                  <Typography display="flex" alignItems="center">
+                    <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
+                    Ephemeral key for this Safe:{' '}
+                    <Box px={1}>
+                      <code>{delegateAddress}</code>
+                    </Box>
+                  </Typography>
+                  <Button color="error" onClick={deleteLocalDelegate}>
+                    Delete
+                  </Button>
+                </>
               ) : (
                 <Button variant="contained" onClick={() => createLocalDelegate()}>
                   Create key
