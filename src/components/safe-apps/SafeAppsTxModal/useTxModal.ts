@@ -8,6 +8,7 @@ import { getSafeSDK } from '@/hooks/coreSDK/safeCoreSDK'
 import { useWeb3ReadOnly } from '@/hooks/wallets/web3'
 import { solidityKeccak256 } from 'ethers/lib/utils'
 import { GelatoRelay } from '@gelatonetwork/relay-sdk'
+import { txDispatch, TxEvent } from '@/services/tx/txEvents'
 
 const relay = new GelatoRelay()
 
@@ -68,6 +69,13 @@ const useTxModal = (): ReturnType => {
         //   const selector = tx.data.slice(0, 10)
         //   // TODO(kevincharm): Remember choice for [to, selector]
         // }
+        // This is necessary to trigger subscription to tx events
+        setTxModalState({
+          isOpen: false,
+          txs,
+          requestId,
+          params,
+        })
         ;(async () => {
           const safeTx = await createMultiSendCallOnlyTx(txs)
           const delegate = new ethers.Wallet(delegatePrivateKey, readOnlyProvider)
@@ -134,6 +142,40 @@ const useTxModal = (): ReturnType => {
             feeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
           })
           console.log(`Gelato relay taskId: ${relayResponse.taskId}`)
+          const safeTxHash = await safe.getTransactionHash(safeTx)
+          txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+            safeAppRequestId: requestId,
+            safeTxHash,
+          })
+
+          // for (let tries = 0; tries < 10; tries++) {
+          //   await new Promise((resolve) => setTimeout(resolve, (tries + 1) * 5000 /** exp backoff */))
+
+          //   const relayTaskStatus = await relay.getTaskStatus(relayResponse.taskId)
+          //   if (!relayTaskStatus) continue
+
+          //   const taskState = relayTaskStatus.taskState
+          //   if (taskState === 'ExecSuccess') {
+          //     return txDispatch(TxEvent.SUCCESS, {
+          //       txId: relayTaskStatus.transactionHash,
+          //       groupKey: '' /** wat is this */,
+          //     })
+          //   } else if (
+          //     taskState === 'CheckPending' ||
+          //     taskState === 'ExecPending' ||
+          //     taskState === 'WaitingForConfirmation'
+          //   ) {
+          //     // "Pending"
+          //     continue
+          //   } else {
+          //     const safeTxHash = await safe.getTransactionHash(safeTx)
+          //     return txDispatch(TxEvent.SAFE_APPS_REQUEST, { safeAppRequestId: requestId, safeTxHash })
+          //   }
+          // }
+
+          // return txDispatch(TxEvent.PROPOSE_FAILED, {
+          //   error: new Error(`Relay failed for: ${relayResponse.taskId}`),
+          // })
         })()
       } else {
         // No delegate enabled -> regular tx signing flow
