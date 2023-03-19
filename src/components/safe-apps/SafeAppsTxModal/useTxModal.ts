@@ -136,13 +136,14 @@ const useTxModal = (): ReturnType => {
               value: safeTx.data.value,
               type: OperationType.Call,
             })
-          ).add(50_000)
+          ).add(100_000)
           const fee = await relay.getEstimatedFee(
             Number(chainId),
-            ethers.constants.AddressZero,
+            '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
             estimatedGasLimit,
             false,
           )
+          console.log(`Estimated relay fee (gasLimit=${estimatedGasLimit.toString()}): ${fee}`)
 
           setSignlessTxModalState((s) => ({
             ...s,
@@ -179,9 +180,11 @@ const useTxModal = (): ReturnType => {
               tryCount: tries,
             }))
             const expFactor = 2 ** tries
-            await new Promise((resolve) => setTimeout(resolve, 2500 * expFactor))
+            await new Promise((resolve) => setTimeout(resolve, 1000 * expFactor))
 
-            const relayTxStatus = await relay.getTaskStatus(relayResponse.taskId)
+            const relayTxStatus = await relay.getTaskStatus(relayResponse.taskId).catch((err) => {
+              console.warn(`Gelato relay task request errored: ${err.message}`)
+            })
             if (!relayTxStatus) continue
 
             setSignlessTxModalState((s) => ({
