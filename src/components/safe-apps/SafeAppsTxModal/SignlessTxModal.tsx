@@ -1,9 +1,28 @@
-import { Box, Grid, Paper, Typography } from '@mui/material'
+import { Box, Button, Grid, Paper, Typography } from '@mui/material'
 import type { SignlessTxModalState } from './useTxModal'
 import LoadingSpinner from '@/components/new-safe/create/steps/StatusStep/LoadingSpinner'
 import { SafeCreationStatus } from '@/components/new-safe/create/steps/StatusStep/useSafeCreation'
+import { useMemo } from 'react'
+import { Close } from '@mui/icons-material'
 
-const SignlessTxModal = ({ data }: { data: SignlessTxModalState }) => {
+const SignlessTxModal = ({
+  data,
+  closeSignlessTxModal,
+}: {
+  data: SignlessTxModalState
+  closeSignlessTxModal: () => void
+}) => {
+  const statusText = useMemo(() => {
+    const relayTxStatus = data.relayTxStatus
+    if (!relayTxStatus) {
+      return 'Submitting to relay...'
+    } else if (relayTxStatus.taskState === 'Cancelled' || relayTxStatus.taskState === 'ExecReverted') {
+      return `${relayTxStatus.taskState}: ${relayTxStatus.lastCheckMessage}`
+    } else {
+      return relayTxStatus.taskState
+    }
+  }, [data.relayTxStatus])
+
   return (
     <Paper
       style={{
@@ -15,6 +34,11 @@ const SignlessTxModal = ({ data }: { data: SignlessTxModalState }) => {
         maxWidth: '100%',
       }}
     >
+      <Box padding={1} style={{ position: 'absolute', right: 0 }}>
+        <Button color="secondary" onClick={closeSignlessTxModal}>
+          <Close />
+        </Button>
+      </Box>
       <Grid container direction="column" padding={4}>
         <Grid item>
           <Grid container alignItems="center">
@@ -28,7 +52,7 @@ const SignlessTxModal = ({ data }: { data: SignlessTxModalState }) => {
                   <Typography color="GrayText">Task state</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body1">{data.relayTxStatus?.taskState || 'Submitting to relay...'}</Typography>
+                  <Typography variant="body1">{statusText}</Typography>
                 </Box>
               </Grid>
             </Grid>

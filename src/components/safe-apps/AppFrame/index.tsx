@@ -57,7 +57,7 @@ type AppFrameProps = {
 
 const AppFrame = ({ appUrl, allowedFeaturesList }: AppFrameProps): ReactElement => {
   const chainId = useChainId()
-  const [txModalState, openTxModal, closeTxModal, signlessTxModalState] = useTxModal()
+  const [txModalState, openTxModal, closeTxModal, signlessTxModalState, closeSignlessTxModal] = useTxModal()
   const [settings, setSettings] = useState<SafeSettings>({})
   const safeMessages = useAppSelector(selectSafeMessages)
   const [signMessageModalState, openSignMessageModal, closeSignMessageModal] = useSignMessageModal()
@@ -305,7 +305,9 @@ const AppFrame = ({ appUrl, allowedFeaturesList }: AppFrameProps): ReactElement 
           />
         )}
 
-        {signlessTxModalState.isOpen && <SignlessTxModal data={signlessTxModalState} />}
+        {signlessTxModalState.isOpen && (
+          <SignlessTxModal data={signlessTxModalState} closeSignlessTxModal={closeSignlessTxModal} />
+        )}
 
         {signMessageModalState.isOpen &&
           (signMessageModalState.isOffChain ? (

@@ -42,6 +42,7 @@ type ReturnType = [
   (txs: BaseTransaction[], requestId: RequestId, params?: SendTransactionRequestParams) => void,
   () => void,
   SignlessTxModalState,
+  () => void,
 ]
 
 const useTxModal = (): ReturnType => {
@@ -132,6 +133,7 @@ const useTxModal = (): ReturnType => {
 
         setSignlessTxModalState((s) => ({
           ...s,
+          isOpen: true,
           estimatedFee: fee,
         }))
         const tx = await signlessContract.populateTransaction.execViaRelay(
@@ -153,12 +155,14 @@ const useTxModal = (): ReturnType => {
 
         setSignlessTxModalState((s) => ({
           ...s,
+          isOpen: true,
           relayTaskId: relayResponse.taskId,
         }))
 
         for (let tries = 0; tries < 8; tries++) {
           setSignlessTxModalState((s) => ({
             ...s,
+            isOpen: true,
             tryCount: tries,
           }))
           const expFactor = 2 ** tries
@@ -169,6 +173,7 @@ const useTxModal = (): ReturnType => {
 
           setSignlessTxModalState((s) => ({
             ...s,
+            isOpen: true,
             relayTxStatus,
           }))
 
@@ -229,7 +234,16 @@ const useTxModal = (): ReturnType => {
 
   const closeTxModal = useCallback(() => setTxModalState(INITIAL_CONFIRM_TX_MODAL_STATE), [])
 
-  return [txModalState, openTxModal, closeTxModal, signlessTxModal]
+  const closeSignlessTxModal = useCallback(
+    () =>
+      setSignlessTxModalState((s) => ({
+        ...s,
+        isOpen: false,
+      })),
+    [setSignlessTxModalState],
+  )
+
+  return [txModalState, openTxModal, closeTxModal, signlessTxModal, closeSignlessTxModal]
 }
 
 export default useTxModal
