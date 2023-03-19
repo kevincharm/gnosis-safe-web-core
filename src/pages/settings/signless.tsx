@@ -16,6 +16,7 @@ import { Errors, logError } from '@/services/exceptions'
 import useChainId from '@/hooks/useChainId'
 import { addDays } from 'date-fns'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import SentimentVeryDissatisfied from '@mui/icons-material/SentimentVeryDissatisfied'
 import css from '@/components/settings/SafeModules/styles.module.css'
 import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender/create'
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers'
@@ -95,7 +96,7 @@ const registerDelegateModalSteps: TxStepperProps['steps'] = [
 ]
 
 const EnableSignless = () => {
-  const { isSignlessEnabled } = useSignlessModule()
+  const { isSignlessEnabled, signlessModuleAddress } = useSignlessModule()
   const { openEnableSignless, setOpenEnableSignless } = useSignlessModals()
 
   return (
@@ -115,17 +116,26 @@ const EnableSignless = () => {
                 delegate the signing of transactions, providing a smoother user experience while using Safe Apps.
               </Typography>
             </Box>
-            <Box pt={4}>
-              {isSignlessEnabled ? (
+            {signlessModuleAddress ? (
+              <Box pt={4}>
+                {isSignlessEnabled ? (
+                  <Typography display="flex" alignItems="center">
+                    <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} /> Signless module is enabled on this Safe.
+                  </Typography>
+                ) : (
+                  <Button variant="contained" onClick={() => setOpenEnableSignless(true)}>
+                    Enable Signless
+                  </Button>
+                )}
+              </Box>
+            ) : (
+              <Box pt={4}>
                 <Typography display="flex" alignItems="center">
-                  <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} /> Signless module is enabled on this Safe.
+                  <SentimentVeryDissatisfied color="warning" sx={{ mr: 0.5 }} /> Signless module is not yet deployed to
+                  this network.
                 </Typography>
-              ) : (
-                <Button variant="contained" onClick={() => setOpenEnableSignless(true)}>
-                  Enable Signless
-                </Button>
-              )}
-            </Box>
+              </Box>
+            )}
           </Grid>
         </Grid>
       </Paper>

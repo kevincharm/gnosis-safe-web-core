@@ -9,8 +9,13 @@ import useSafeInfo from './useSafeInfo'
 import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
-  if (chainId === '100') {
-    return '0x0841dEF9362c205a5F59A5e232d925fC7A8d8537'
+  switch (chainId) {
+    case '100':
+      return '0xb9Cd1dd44799f508769040156962E01ADf97e330'
+    case '84531':
+      return '0xb9Cd1dd44799f508769040156962E01ADf97e330'
+    default:
+      return undefined
   }
 }
 
