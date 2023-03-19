@@ -52,7 +52,7 @@ const SignlessTxModal = ({
                   <Typography color="GrayText">Task state</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body1">{statusText}</Typography>
+                  <Typography variant="body1">{data.errorMessage || statusText}</Typography>
                 </Box>
               </Grid>
             </Grid>
