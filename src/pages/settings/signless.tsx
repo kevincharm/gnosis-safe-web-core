@@ -1,6 +1,6 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
-import { Box, Button, Grid, Paper, Typography } from '@mui/material'
+import { Box, Button, Grid, Paper, TextField, Typography } from '@mui/material'
 import SettingsHeader from '@/components/settings/SettingsHeader'
 import SignOrExecuteForm from '@/components/tx/SignOrExecuteForm'
 import useSignlessModule, {
@@ -11,13 +11,15 @@ import TxModal from '@/components/tx/TxModal'
 import type { TxStepperProps } from '@/components/tx/TxStepper/useTxStepper'
 import useAsync from '@/hooks/useAsync'
 import type { SafeTransaction } from '@safe-global/safe-core-sdk-types'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Errors, logError } from '@/services/exceptions'
 import useChainId from '@/hooks/useChainId'
 import { addDays } from 'date-fns'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import css from '@/components/settings/SafeModules/styles.module.css'
 import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender/create'
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 
 function useSignlessModals() {
   const [openEnableSignless, setOpenEnableSignless] = useState<boolean>(false)
@@ -113,7 +115,7 @@ const EnableSignless = () => {
                 delegate the signing of transactions, providing a smoother user experience while using Safe Apps.
               </Typography>
             </Box>
-            <Box pt={2}>
+            <Box pt={4}>
               {isSignlessEnabled ? (
                 <Typography display="flex" alignItems="center">
                   <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} /> Signless module is enabled on this Safe.
@@ -152,20 +154,24 @@ const LocalDelegate = () => {
                 transactions on your behalf. This private key is never sent to any third-party.
               </Typography>
             </Box>
-            <Box pt={2}>
+            <Box pt={4}>
               {delegatePrivateKey ? (
-                <>
-                  <Typography display="flex" alignItems="center">
-                    <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
-                    Ephemeral key for this Safe:{' '}
-                    <Box px={1}>
-                      <code>{delegateAddress}</code>
-                    </Box>
-                  </Typography>
-                  <Button color="error" onClick={deleteLocalDelegate}>
-                    Delete
-                  </Button>
-                </>
+                <Grid container direction="column" spacing={2}>
+                  <Grid item>
+                    <Typography display="flex" alignItems="center">
+                      <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
+                      Ephemeral key for this Safe:{' '}
+                      <Box px={1}>
+                        <code>{delegateAddress}</code>
+                      </Box>
+                    </Typography>
+                  </Grid>
+                  <Grid item>
+                    <Button color="error" onClick={deleteLocalDelegate}>
+                      Delete
+                    </Button>
+                  </Grid>
+                </Grid>
               ) : (
                 <Button variant="contained" onClick={() => createLocalDelegate()}>
                   Create key
@@ -239,8 +245,7 @@ const RegisterDelegate = () => {
   const { delegateAddress, isValidDelegate, isSignlessEnabled, registeredDelegates } = useSignlessModule()
   const { openRegisterDelegate, setOpenRegisterDelegate } = useSignlessModals()
 
-  // TODO(kevincharm): take expiry from a textfield
-  const expiry = useMemo(() => Math.floor(addDays(new Date(), 7).valueOf() / 1000), [])
+  const [expirySeconds, setExpirySeconds] = useState<number>(Math.floor(addDays(new Date(), 7).valueOf() / 1000))
 
   return (
     <>
@@ -257,10 +262,11 @@ const RegisterDelegate = () => {
               <Typography>
                 Your local ephemeral key must be registered to this Safe on the Signless module (on-chain). This allows
                 your local Safe instance to automatically sign transactions on your behalf and submit them to the Gelato
-                Relay network.
+                Relay network. Your ephemeral key will be usable until the specified expiry, after which you must renew
+                the key via another transaction.
               </Typography>
             </Box>
-            <Box pt={2}>
+            <Box pt={4}>
               {isValidDelegate ? (
                 <Typography display="flex" alignItems="center">
                   <CheckCircleIcon color="primary" sx={{ mr: 0.5 }} />
@@ -268,18 +274,42 @@ const RegisterDelegate = () => {
                 </Typography>
               ) : (
                 delegateAddress && (
-                  <Button
-                    variant="contained"
-                    onClick={() => setOpenRegisterDelegate(true)}
-                    disabled={!isSignlessEnabled}
-                  >
-                    Register {delegateAddress.slice(0, 6)}..{delegateAddress.slice(-4)} as delegate
-                  </Button>
+                  <Grid container direction="column" spacing={2}>
+                    <Grid item>
+                      <LocalizationProvider dateAdapter={AdapterDateFns}>
+                        <DatePicker
+                          label="Expiry"
+                          value={expirySeconds * 1000}
+                          onChange={(value) => {
+                            if (!value) return
+                            setExpirySeconds(Math.floor(value / 1000))
+                          }}
+                          renderInput={(props) => <TextField type="date" {...props} />}
+                        />
+                      </LocalizationProvider>
+                    </Grid>
+                    <Grid item>
+                      <Button
+                        variant="contained"
+                        onClick={() => setOpenRegisterDelegate(true)}
+                        disabled={!isSignlessEnabled}
+                      >
+                        Register {delegateAddress.slice(0, 6)}..{delegateAddress.slice(-4)} as delegate
+                      </Button>
+                    </Grid>
+                  </Grid>
                 )
               )}
-              {registeredDelegates.map((delegate, i) => (
-                <RegisteredDelegate key={i} index={i} delegate={delegate} />
-              ))}
+              <Grid container direction="column" pt={4}>
+                <Grid item>
+                  <Typography variant="h5">Registered keys</Typography>
+                </Grid>
+                <Grid item>
+                  {registeredDelegates.map((delegate, i) => (
+                    <RegisteredDelegate key={i} index={i} delegate={delegate} />
+                  ))}
+                </Grid>
+              </Grid>
             </Box>
           </Grid>
         </Grid>
@@ -288,7 +318,7 @@ const RegisterDelegate = () => {
         <TxModal
           onClose={() => setOpenRegisterDelegate(false)}
           steps={registerDelegateModalSteps}
-          initialData={[{ delegateAddress, expiry }]}
+          initialData={[{ delegateAddress, expiry: expirySeconds }]}
         />
       )}
     </>
