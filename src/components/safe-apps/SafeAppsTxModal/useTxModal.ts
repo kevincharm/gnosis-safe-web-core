@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react'
 import type { BaseTransaction, RequestId, SendTransactionRequestParams } from '@safe-global/safe-apps-sdk'
 import useSignlessModule from '@/hooks/useSignlessModule'
 import { createMultiSendCallOnlyTx } from '@/services/tx/tx-sender'
-import { BigNumber, ethers } from 'ethers'
+import { ethers } from 'ethers'
+import type { BigNumber } from 'ethers'
 import useChainId from '@/hooks/useChainId'
 import { getSafeSDK } from '@/hooks/coreSDK/safeCoreSDK'
 import { useWeb3ReadOnly } from '@/hooks/wallets/web3'
@@ -11,6 +12,7 @@ import { GelatoRelay } from '@gelatonetwork/relay-sdk'
 import type { TransactionStatusResponse } from '@gelatonetwork/relay-sdk'
 import { txDispatch, TxEvent } from '@/services/tx/txEvents'
 import type { SafeTransaction } from '@safe-global/safe-core-sdk-types'
+import { OperationType } from '@safe-global/safe-core-sdk-types'
 
 const relay = new GelatoRelay()
 
@@ -35,6 +37,7 @@ export interface SignlessTxModalState {
   relayTaskId?: string
   tryCount?: number
   relayTxStatus?: TransactionStatusResponse
+  errorMessage?: string
 }
 
 type ReturnType = [
@@ -42,6 +45,7 @@ type ReturnType = [
   (txs: BaseTransaction[], requestId: RequestId, params?: SendTransactionRequestParams) => void,
   () => void,
   SignlessTxModalState,
+  () => void,
 ]
 
 const useTxModal = (): ReturnType => {
@@ -70,139 +74,159 @@ const useTxModal = (): ReturnType => {
         isValidDelegate &&
         delegatePrivateKey
       ) {
-        setSignlessTxModalState({
-          isOpen: true,
-        })
-        // This is necessary to trigger subscription to tx events
-        setTxModalState({
-          isOpen: false,
-          txs,
-          requestId,
-          params,
-        })
-        const safeTx = await createMultiSendCallOnlyTx(txs)
-        const delegate = new ethers.Wallet(delegatePrivateKey, readOnlyProvider)
-        const nonce = await signlessContract.getNonce(delegateAddress)
-        const execTxSig = await delegate._signTypedData(
-          {
-            name: 'SignlessSafeModule',
-            version: '1.0.0',
+        try {
+          setSignlessTxModalState({
+            isOpen: true,
+          })
+          // This is necessary to trigger subscription to tx events
+          setTxModalState({
+            isOpen: false,
+            txs,
+            requestId,
+            params,
+          })
+          const safeTx = await createMultiSendCallOnlyTx(txs)
+          const delegate = new ethers.Wallet(delegatePrivateKey, readOnlyProvider)
+          const nonce = await signlessContract.getNonce(delegateAddress)
+          const execTxSig = await delegate._signTypedData(
+            {
+              name: 'SignlessSafeModule',
+              version: '1.0.0',
+              chainId,
+              verifyingContract: signlessModuleAddress,
+            },
+            {
+              ExecSafeTx: [
+                {
+                  type: 'address',
+                  name: 'safe',
+                },
+                {
+                  type: 'address',
+                  name: 'to',
+                },
+                {
+                  type: 'uint256',
+                  name: 'value',
+                },
+                {
+                  type: 'bytes32',
+                  name: 'dataHash',
+                },
+                {
+                  type: 'uint256',
+                  name: 'nonce',
+                },
+              ],
+            },
+            {
+              safe: safe.getAddress(),
+              to: safeTx.data.to,
+              value: safeTx.data.value,
+              dataHash: solidityKeccak256(['bytes'], [safeTx.data.data]),
+              nonce,
+            },
+          )
+
+          const estimatedGasLimit = (
+            await readOnlyProvider.estimateGas({
+              to: safeTx.data.to,
+              from: safe.getAddress(),
+              data: safeTx.data.data,
+              value: safeTx.data.value,
+              type: OperationType.Call,
+            })
+          ).add(50_000)
+          const fee = await relay.getEstimatedFee(
+            Number(chainId),
+            ethers.constants.AddressZero,
+            estimatedGasLimit,
+            false,
+          )
+
+          setSignlessTxModalState((s) => ({
+            ...s,
+            isOpen: true,
+            estimatedFee: fee,
+          }))
+          const tx = await signlessContract.populateTransaction.execViaRelay(
+            fee.mul(2),
+            delegateAddress,
+            safe.getAddress(),
+            safeTx.data.to,
+            safeTx.data.value,
+            safeTx.data.data,
+            execTxSig,
+          )
+          const relayResponse = await relay.callWithSyncFee({
             chainId,
-            verifyingContract: signlessModuleAddress,
-          },
-          {
-            ExecSafeTx: [
-              {
-                type: 'address',
-                name: 'safe',
-              },
-              {
-                type: 'address',
-                name: 'to',
-              },
-              {
-                type: 'uint256',
-                name: 'value',
-              },
-              {
-                type: 'bytes32',
-                name: 'dataHash',
-              },
-              {
-                type: 'uint256',
-                name: 'nonce',
-              },
-            ],
-          },
-          {
-            safe: safe.getAddress(),
-            to: safeTx.data.to,
-            value: safeTx.data.value,
-            dataHash: solidityKeccak256(['bytes'], [safeTx.data.data]),
-            nonce,
-          },
-        )
-
-        const fee = await relay.getEstimatedFee(
-          Number(chainId),
-          ethers.constants.AddressZero,
-          BigNumber.from(300_000) /** TODO(kevincharm): How do we get the estimated gas limit */,
-          false,
-        )
-
-        setSignlessTxModalState((s) => ({
-          ...s,
-          estimatedFee: fee,
-        }))
-        const tx = await signlessContract.populateTransaction.execViaRelay(
-          fee.mul(2),
-          delegateAddress,
-          safe.getAddress(),
-          safeTx.data.to,
-          safeTx.data.value,
-          safeTx.data.data,
-          execTxSig,
-        )
-        const relayResponse = await relay.callWithSyncFee({
-          chainId,
-          target: signlessModuleAddress,
-          data: tx.data!,
-          feeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-        })
-        console.log(`Gelato relay taskId: ${relayResponse.taskId}`)
-
-        setSignlessTxModalState((s) => ({
-          ...s,
-          relayTaskId: relayResponse.taskId,
-        }))
-
-        for (let tries = 0; tries < 8; tries++) {
-          setSignlessTxModalState((s) => ({
-            ...s,
-            tryCount: tries,
-          }))
-          const expFactor = 2 ** tries
-          await new Promise((resolve) => setTimeout(resolve, 2500 * expFactor))
-
-          const relayTxStatus = await relay.getTaskStatus(relayResponse.taskId)
-          if (!relayTxStatus) continue
+            target: signlessModuleAddress,
+            data: tx.data!,
+            feeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+          })
+          console.log(`Gelato relay taskId: ${relayResponse.taskId}`)
 
           setSignlessTxModalState((s) => ({
             ...s,
-            relayTxStatus,
+            isOpen: true,
+            relayTaskId: relayResponse.taskId,
           }))
 
-          const taskState = relayTxStatus.taskState
-          if (taskState === 'ExecSuccess') {
-            setTimeout(() => {
-              setSignlessTxModalState((s) => ({
-                ...s,
-                isOpen: false,
-              }))
-            }, 1000)
-            return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
-              safeAppRequestId: requestId,
-              safeTxHash: relayTxStatus.transactionHash!,
-            })
-          } else if (
-            taskState === 'CheckPending' ||
-            taskState === 'ExecPending' ||
-            taskState === 'WaitingForConfirmation'
-          ) {
-            // "Pending"
-            continue
-          } else {
-            return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
-              safeAppRequestId: requestId,
-              safeTxHash: relayTxStatus.transactionHash!,
-            })
+          for (let tries = 0; tries < 8; tries++) {
+            setSignlessTxModalState((s) => ({
+              ...s,
+              isOpen: true,
+              tryCount: tries,
+            }))
+            const expFactor = 2 ** tries
+            await new Promise((resolve) => setTimeout(resolve, 2500 * expFactor))
+
+            const relayTxStatus = await relay.getTaskStatus(relayResponse.taskId)
+            if (!relayTxStatus) continue
+
+            setSignlessTxModalState((s) => ({
+              ...s,
+              isOpen: true,
+              relayTxStatus,
+            }))
+
+            const taskState = relayTxStatus.taskState
+            if (taskState === 'ExecSuccess') {
+              setTimeout(() => {
+                setSignlessTxModalState((s) => ({
+                  ...s,
+                  isOpen: false,
+                }))
+              }, 1000)
+              return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+                safeAppRequestId: requestId,
+                safeTxHash: relayTxStatus.transactionHash!,
+              })
+            } else if (
+              taskState === 'CheckPending' ||
+              taskState === 'ExecPending' ||
+              taskState === 'WaitingForConfirmation'
+            ) {
+              // "Pending"
+              continue
+            } else {
+              return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+                safeAppRequestId: requestId,
+                safeTxHash: relayTxStatus.transactionHash!,
+              })
+            }
           }
+        } catch (err) {
+          setSignlessTxModalState((s) => ({
+            ...s,
+            errorMessage: (err as Error).message,
+          }))
+        } finally {
+          return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
+            safeAppRequestId: requestId,
+            safeTxHash: '0x',
+          })
         }
-
-        return txDispatch(TxEvent.SAFE_APPS_REQUEST, {
-          safeAppRequestId: requestId,
-          safeTxHash: '0x',
-        })
       } else {
         // No delegate enabled -> regular tx signing flow
         return setTxModalState({
@@ -229,7 +253,16 @@ const useTxModal = (): ReturnType => {
 
   const closeTxModal = useCallback(() => setTxModalState(INITIAL_CONFIRM_TX_MODAL_STATE), [])
 
-  return [txModalState, openTxModal, closeTxModal, signlessTxModal]
+  const closeSignlessTxModal = useCallback(
+    () =>
+      setSignlessTxModalState((s) => ({
+        ...s,
+        isOpen: false,
+      })),
+    [setSignlessTxModalState],
+  )
+
+  return [txModalState, openTxModal, closeTxModal, signlessTxModal, closeSignlessTxModal]
 }
 
 export default useTxModal
