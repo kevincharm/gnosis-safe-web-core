@@ -1,6 +1,6 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
-import { Box, Button, Grid, Paper, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Grid, Paper, TextField, Typography } from '@mui/material'
 import SettingsHeader from '@/components/settings/SettingsHeader'
 import SignOrExecuteForm from '@/components/tx/SignOrExecuteForm'
 import useSignlessModule, {
@@ -115,6 +115,9 @@ const EnableSignless = () => {
                 Enabling the Signless module on this Safe allows you to create an ephemeral key to which you can
                 delegate the signing of transactions, providing a smoother user experience while using Safe Apps.
               </Typography>
+              <Box pt={2}>
+                <Alert severity="warning">Please note: Signless has not been audited. Please use with caution.</Alert>
+              </Box>
             </Box>
             {signlessModuleAddress ? (
               <Box pt={4}>

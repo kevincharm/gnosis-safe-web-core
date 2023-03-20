@@ -10,6 +10,8 @@ import { useWeb3ReadOnly } from './wallets/web3'
 
 export function getSignlessModuleAddress(chainId: string) {
   switch (chainId) {
+    case '1':
+      return '0xb9Cd1dd44799f508769040156962E01ADf97e330'
     case '100':
       return '0xb9Cd1dd44799f508769040156962E01ADf97e330'
     case '84531':
