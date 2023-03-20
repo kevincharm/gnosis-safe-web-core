@@ -116,7 +116,9 @@ const EnableSignless = () => {
                 delegate the signing of transactions, providing a smoother user experience while using Safe Apps.
               </Typography>
               <Box pt={2}>
-                <Alert severity="warning">Please note: Signless has not been audited. Please use with caution.</Alert>
+                <Alert variant="filled" severity="warning">
+                  Please note: Signless has not been audited. Please use with caution.
+                </Alert>
               </Box>
             </Box>
             {signlessModuleAddress ? (
